@@ -1,18 +1,30 @@
-#######################################
-#Author: Paulo Brando
-#March 30th, 2021
-#Calculate tree growth rates
-#######################################
+------------------------------------------------------------------------
 
-#import libraries
+title: "R Notebook Tree growth example" output: html_notebook Author: Paulo Brando March 30th, 2021 Calculate tree growth rates
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.retina = 2,
+  fig.align = 'center'
+)
+```
+
+Import libraries
+
+```{r}
+
+library(ggridges)
 library(lubridate)
 library(tidyverse)
 
-###
-###
-###
+```
 
-#set working directory
+Set working directory and Importing the main dataset - tree growth. Very messy dataset.
+
+```{r}
+
 setwd("/Volumes/GoogleDrive/My Drive/Teaching/2021/Data_Visualization/R/DataVisEss")
 
 #list files/folders in that directory
@@ -21,12 +33,11 @@ list.files()
 #list files in the folder "Data"
 (file_import <- list.files(path = "Data"))[1]
 
-###
-###
-###
-
-#Importing tree growth
 gr <- read_csv(file.path("Data", file_import)[1])
+
+```
+
+```{r}
 
 #Replace all -9999 in the file by NA
 gr[gr == -9999] = NA
@@ -35,11 +46,16 @@ gr[gr == -9999] = NA
 glimpse(gr)
 #View(gr)
 #print column names
+
+```
+
+```{r}
+
 names(gr)
 
-###
-###
-###
+```
+
+```{r}
 
 #Create a subset only with trees diameters
 dbh <- gr %>% 
@@ -57,10 +73,9 @@ dates <- gr[,c(1:9, seq(14, ncol(gr), 4))] %>%
                cols = MidDate19996.23.1999:date_3.3.2006) %>%
   select(-c(Treatment:Var))
 
-###
-###
-###
+```
 
+```{r}
 #combine growth and date again
 growth <- dates %>% 
   bind_cols(dbh) %>%
@@ -73,9 +88,9 @@ growth <- dates %>%
   ungroup() %>% #remove grouping variables
   filter(Date2 < mdy("04-01-2010")) #filter dates 
 
-###
-###
-###
+```
+
+```{r}
 
 #Summarize by Treatment and Date -- global stats
 gr_avg <- growth%>%
@@ -84,11 +99,9 @@ gr_avg <- growth%>%
             Med_growth = median(Growth_mo, na.rm = TRUE),
             upper = Hmisc::smean.cl.boot(Growth_mo, na.rm=TRUE)[1],
             lower = Hmisc::smean.cl.boot(Growth_mo, na.rm=TRUE)[2])
+```
 
-
-###
-###
-###
+```{r}
 
 #Plotting by stages 
 ggplot()+ #create empty ggplot object
@@ -114,11 +127,9 @@ ggplot()+ #create empty ggplot object
   #create one panel for each treatment
   facet_wrap(~Treatment) +
   theme_minimal(base_size = 16)
-  
-  
-###
-###
-###
+```
+
+```{r}
 
 #cumulative tree growth
 growth%>%
@@ -139,12 +150,11 @@ growth%>%
   facet_wrap(~Treatment) +
   theme_minimal(base_size = 16)
 
-###
-###
-##
+```
 
-#import library to plot distributions
-library(ggridges)
+import library to plot distributions
+
+```{r}
 
 growth %>%
   filter(abs(Growth_mo) < 0.01) %>%
@@ -165,5 +175,4 @@ growth %>%
   facet_wrap(~Treatment) +
   theme_ridges(font_size = 13, grid = TRUE) 
 
-
-#
+```
