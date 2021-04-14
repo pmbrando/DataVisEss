@@ -1,0 +1,186 @@
+---
+title: "Week3_Raster_Precipitation"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+We are going to use a couple libraries to import raster data (raster), handle file names (tidyverse), and plot nice figures (rasterVis).
+
+```{r import_lib, echo=TRUE, warning=FALSE}
+
+library(raster)
+library(rasterVis)
+library(tidyverse)
+
+
+```
+
+Here, we have to list the file path and names. I also listed only the file names, so I can subset it easily. 
+```{r import_files, echo=TRUE}
+
+#dir_files <- "/Volumes/GoogleDrive/My Drive/Teaching/2021/Data_Visualization/R/DataVisEss/Geodata/TRMM_Precip"
+dir_files <- "~/Documents/Temp/Trmm"
+
+
+path_files <- list.files(path = dir_files, 
+                         full.names = TRUE,
+                         pattern = "*nc")
+files <- list.files(path = dir_files, 
+                         full.names = FALSE,
+                         pattern = "*.nc")
+head(files)
+```
+
+This step is super important. It makes it very easy to choose which files to import. 
+
+```{r organize_files, echo = TRUE}
+
+table_names <- as_tibble(files) %>%
+  bind_cols(path_files) %>%
+  rename(File_path = `...2`) %>%
+  mutate(value = str_sub(value, start = 1, end = 13)) %>%
+  separate(value, c("Prod_name",  "yyyymmdd")) %>%
+  select(yyyymmdd, File_path) %>%
+  mutate(Yr = str_sub(yyyymmdd, start = 1, end = 4),
+         Mo = str_sub(yyyymmdd, start = 5, end = 6),
+         Da = str_sub(yyyymmdd, start = 7, end = 8)) %>%
+  filter(Yr %in% 2015:2019)
+
+table_names
+```
+
+Let's import the files and rename them. 
+
+```{r import_rename, echo=TRUE}
+
+trmm_stack <- stack(table_names$File_path)
+extent(trmm_stack) = c(xmin = -124.102, xmax = -110.039, ymin = 34.453, ymax = 44.297)
+crs(trmm_stack) <- CRS('+proj=longlat +ellps=WGS84')
+
+trmm_stack
+names(trmm_stack) <- table_names$yyyymmdd
+trmm_stack
+
+```
+
+Taking the average of 5 yrs of data.
+
+```{r basic_ex, echo = TRUE}
+
+trmm_mean <- mean(trmm_stack)
+
+#plot(trmm_mean)
+levelplot(trmm_mean, margin = FALSE)
+
+#cellStats(trmm_stack, "mean")
+```
+
+Let's plot the data in different ways. 
+
+```{r colors, echo=TRUE}
+library(RColorBrewer)
+cutpts <- seq(0, 0.30, length = 10)
+
+levelplot(trmm_mean, margin = FALSE, at=cutpts, cuts=11, pretty=T,
+          col.regions=(rev(brewer.pal(10,"RdBu"))))
+
+mapTheme <- rasterTheme(region=brewer.pal(8,"Blues"))
+levelplot(trmm_mean, margin = FALSE, par.settings =mapTheme)
+```
+
+One option is to transform raster data into tabular data and do some stats. 
+
+```{r from_raster_to_tab, echo = TRUE}
+
+trmm_tab <- as.data.frame(trmm_stack) %>%
+  as_tibble()
+
+trmm_long <- trmm_tab %>%
+  pivot_longer(names_to = "yyyymmdd", values_to = "values", cols = X20150101:X20191201) %>%
+  mutate(Yr = str_sub(yyyymmdd, start = 2, end = 5),
+         Mo = str_sub(yyyymmdd, start = 6, end = 7),
+         Da = str_sub(yyyymmdd, start = 8, end = 9)) 
+```
+
+
+```{r ploting_data, echo=TRUE}
+
+trmm_long %>%
+  ggplot(aes(x = as.numeric(Mo), y = values)) +
+  stat_summary(fun.data =  "mean_cl_boot", geom = "ribbon") +
+  facet_wrap(~Yr) +
+  theme_minimal()
+
+trmm_long %>%
+  ggplot(aes(x = Mo, y = values, color = as.factor(Yr))) +
+  stat_summary(fun.data =  "mean_cl_boot") +
+  theme_minimal()
+
+trmm_long %>%
+  ggplot(aes(x = as.numeric(Mo), 
+             y = values, color = as.factor(Yr))) +
+  geom_smooth() +
+  theme_minimal()
+
+```
+
+```{r avg_by_groups}
+
+trmm_2015 <-trmm_stack[[which(table_names$Yr == 2015)]]
+avg_2015 <- mean(trmm_2015)
+
+trmm_all <-trmm_stack[[which(table_names$Yr != 2015)]]
+avg_all <- mean(trmm_all)
+
+###
+###
+###
+diff_15_all <- avg_2015 - avg_all
+
+###
+###
+###
+
+levelplot(diff_15_all, margin = FALSE)
+levelplot(diff_15_all, margin = FALSE, contour=TRUE)
+levelplot(diff_15_all, margin = TRUE, contour=TRUE)
+levelplot(diff_15_all, margin = TRUE, contour=TRUE, par.settings = RdBuTheme)
+
+```
+
+```{r stackApply}
+yr_trmm <- stackApply(trmm_stack, indices = as.integer(table_names$Yr), fun = mean, na.rm = TRUE)
+
+levelplot(yr_trmm, margin = TRUE, contour=TRUE, par.settings = RdBuTheme)
+levelplot(yr_trmm, margin = TRUE, contour=TRUE, par.settings = RdBuTheme) 
+```
+
+```{r drought_yr}
+hist(diff_15_all)
+```
+
+
+```{r}
+
+library(ggridges)
+
+trmm_long %>%
+  ggplot(aes(x = values, 
+             y = Yr, 
+             fill = stat(x))) +
+  geom_density_ridges_gradient(alpha = 0.1) +
+  scale_fill_viridis_c(name = "Prec (mm/hr)", option = "C") +
+  #labs(title = 'Temperatures in Lincoln NE in 2016') +
+  theme_ridges(font_size = 13, grid = TRUE) +
+  theme(axis.title.y = element_blank())
+
+trmm_long %>%
+  ggplot(aes(x = values, 
+             y = Yr,
+             fill = as.factor(Yr))) +
+  geom_density_ridges(alpha = 0.5) +
+  theme_ridges(font_size = 13, grid = TRUE) +
+  theme(axis.title.y = element_blank())
+
+```

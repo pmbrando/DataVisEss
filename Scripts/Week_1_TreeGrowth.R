@@ -19,14 +19,15 @@ setwd("/Volumes/GoogleDrive/My Drive/Teaching/2021/Data_Visualization/R/DataVisE
 list.files()
 
 #list files in the folder "Data"
-(file_import <- list.files(path = "Data"))[1]
-
+(file_import <- list.files(path = "Data", pattern = "*.csv"))
+#files <- lapply(listFiles, read_csv)
+#files_dataFrame <- do.call(rbind, files)
 ###
 ###
 ###
 
 #Importing tree growth
-gr <- read_csv(file.path("Data", file_import)[1])
+gr <- read_csv(file.path("Data", file_import))
 
 #Replace all -9999 in the file by NA
 gr[gr == -9999] = NA
